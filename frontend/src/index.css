@@ -1,0 +1,47 @@
+@import "tailwindcss";
+
+@theme {
+  --font-serif: "Fraunces", "Iowan Old Style", Georgia, serif;
+  --font-sans: "Outfit", "Avenir Next", "Segoe UI", sans-serif;
+  --color-cream: #f4eee6;
+  --color-paper: #fffaf4;
+  --color-ink: #2b221c;
+  --color-muted: #7d6e64;
+  --color-line: #e6d8c9;
+  --color-clay: #b85c38;
+  --color-clay-deep: #8d4327;
+  --color-moss: #2f6b4f;
+  --color-moss-soft: #e6f3ec;
+  --color-blush: #f8ebe3;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  color: var(--color-ink);
+  background:
+    radial-gradient(900px 420px at 0% -10%, rgb(243 214 196 / 80%), transparent 60%),
+    radial-gradient(700px 380px at 100% 0%, rgb(232 214 190 / 90%), transparent 55%),
+    var(--color-cream);
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: progress;
+  opacity: 0.65;
+}

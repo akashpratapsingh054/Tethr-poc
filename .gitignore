@@ -1,0 +1,7 @@
+node_modules/
+.env
+dist/
+client_secret*.json
+*.tsbuildinfo
+client_secret*.json
+supabase.txt

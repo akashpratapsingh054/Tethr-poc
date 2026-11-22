@@ -112,3 +112,24 @@ export async function insertComment(input: {
 
   return unwrap(data as CommentRecord | null, error, 'Could not post comment');
 }
+
+
+export async function getEntryById(entryId: string): Promise<EntryRecord | null> {
+  const { data, error } = await supabase
+    .from('user_entries')
+    .select('*')
+    .eq('id', entryId)
+    .maybeSingle();
+
+  if (error) {
+    throw new HttpError(502, error.message);
+  }
+  return (data as EntryRecord | null) ?? null;
+}
+
+export async function deleteEntryById(entryId: string): Promise<void> {
+  const { error } = await supabase.from('user_entries').delete().eq('id', entryId);
+  if (error) {
+    throw new HttpError(502, error.message);
+  }
+}

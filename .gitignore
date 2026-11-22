@@ -5,3 +5,4 @@ client_secret*.json
 *.tsbuildinfo
 client_secret*.json
 supabase.txt
+akash-readme.md

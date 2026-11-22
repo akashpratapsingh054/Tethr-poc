@@ -67,7 +67,9 @@ async function getOrCreateVaultFolder(userId: string): Promise<string> {
     pageSize: 1,
   });
 
-  const folderId = existing.data.files?.[0]?.id;
+  const files = existing.data.files || [];
+  const folderId = files.length > 0 ? files[0].id : undefined;
+
   if (folderId) return folderId;
 
   const created = await drive.files.create({
@@ -167,4 +169,17 @@ export async function openImageStream(
     stream: media.data as unknown as Readable,
     mimeType: meta.data.mimeType || 'image/jpeg',
   };
+}
+
+export async function deleteDriveFile(userId: string, fileId: string): Promise<void> {
+  const drive = await getAuthorizedDrive(userId);
+  try {
+    await drive.files.delete({ fileId });
+  } catch (err: unknown) {
+    const status =
+      (err as { code?: number; response?: { status?: number } })?.code ??
+      (err as { response?: { status?: number } })?.response?.status;
+    if (status === 404) return;
+    throw err;
+  }
 }

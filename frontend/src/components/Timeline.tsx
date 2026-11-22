@@ -1,7 +1,9 @@
 import { useState } from 'react'
-import { Download, Maximize2, MessageCircle, Send } from 'lucide-react'
+import { Download, Maximize2, Trash2 } from 'lucide-react'
 import { API_URL } from '../lib/api.ts'
 import type { Entry } from '../types.ts'
+import { CommentSection } from './CommentSection.tsx'
+import { DeleteConfirmModal } from './DeleteConfirmModal.tsx'
 import { LightboxModal } from './LightboxModal.tsx'
 
 type TimelineProps = {
@@ -30,9 +32,13 @@ function formatKb(value: Entry['original_size_kb']) {
   return `${amount.toFixed(1)} KB`
 }
 
-function shortAuthor(email: string) {
-  const parts = email.split('@')
-  return parts || email
+function getEntryHeader(entry: Entry) {
+  if (entry.entry_type === 'text') {
+    return entry.title?.trim() || 'Untitled note'
+  }
+  const caption = entry.caption?.trim()
+  if (!caption) return 'Untitled snapshot'
+  return caption.length > 48 ? `${caption.slice(0, 48)}…` : caption
 }
 
 function MemoryImage({
@@ -98,39 +104,36 @@ export function Timeline({
   onCommentAdded,
 }: TimelineProps) {
   const [expandedEntry, setExpandedEntry] = useState<Entry | null>(null)
-  const [drafts, setDrafts] = useState<Record<string, string>>({})
-  const [submittingId, setSubmittingId] = useState<string | null>(null)
+  const [confirmDeleteEntry, setConfirmDeleteEntry] = useState<Entry | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
   const expandedSrc =
     expandedEntry?.drive_file_id
       ? `${API_URL}/api/media/image/${expandedEntry.drive_file_id}?user_id=${expandedEntry.user_id || userId}`
       : null
 
-  async function submitComment(entryId: string) {
-    const text = (drafts[entryId] || '').trim()
-    if (!text) return
+  async function confirmDelete() {
+    if (!confirmDeleteEntry) return
 
-    setSubmittingId(entryId)
+    setDeleting(true)
     try {
-      const response = await fetch(`${API_URL}/api/entries/${entryId}/comments`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          user_id: userId,
-          author_email: userEmail,
-          comment_text: text,
-        }),
-      })
+      const response = await fetch(
+        `${API_URL}/api/entries/${confirmDeleteEntry.id}?user_id=${encodeURIComponent(userId)}`,
+        { method: 'DELETE' }
+      )
       if (!response.ok) {
         const body = await response.json().catch(() => ({}))
-        throw new Error(body.error || 'Could not post comment')
+        throw new Error(body.error || 'Could not delete memory')
       }
-      setDrafts((prev) => ({ ...prev, [entryId]: '' }))
+      if (expandedEntry?.id === confirmDeleteEntry.id) {
+        setExpandedEntry(null)
+      }
+      setConfirmDeleteEntry(null)
       await onCommentAdded()
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to post reply')
+      alert(err instanceof Error ? err.message : 'Failed to delete memory')
     } finally {
-      setSubmittingId(null)
+      setDeleting(false)
     }
   }
 
@@ -160,7 +163,7 @@ export function Timeline({
             ? `${API_URL}/api/media/image/${entry.drive_file_id}?user_id=${entry.user_id || userId}`
             : ''
           const fileName = entry.drive_file_name || `tethr-${entry.id.slice(0, 8)}.jpg`
-          const comments = entry.comments ?? []
+          const isCreator = entry.user_id === userId
 
           return (
             <article
@@ -181,15 +184,28 @@ export function Timeline({
                   <p className="text-[11px] tracking-[0.16em] text-muted uppercase">
                     {entry.entry_type === 'image' ? 'Snapshot' : 'Note'} · {formatWhen(entry.created_at)}
                   </p>
-                  {entry.entry_type === 'image' && imgSrc ? (
-                    <button
-                      type="button"
-                      onClick={() => setExpandedEntry(entry)}
-                      className="text-xs font-medium text-clay-deep underline-offset-2 hover:underline"
-                    >
-                      Expand
-                    </button>
-                  ) : null}
+                  <div className="flex items-center gap-2.5">
+                    {entry.entry_type === 'image' && imgSrc ? (
+                      <button
+                        type="button"
+                        onClick={() => setExpandedEntry(entry)}
+                        className="text-xs font-medium text-clay-deep underline-offset-2 hover:underline"
+                      >
+                        Expand
+                      </button>
+                    ) : null}
+
+                    {isCreator ? (
+                      <button
+                        type="button"
+                        onClick={() => setConfirmDeleteEntry(entry)}
+                        title="Delete post"
+                        className="text-muted transition hover:text-clay-deep"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    ) : null}
+                  </div>
                 </div>
 
                 {entry.entry_type === 'text' ? (
@@ -207,53 +223,13 @@ export function Timeline({
                   </p>
                 ) : null}
 
-                <div className="mt-3 border-t border-line/80 pt-3">
-                  {comments.length > 0 ? (
-                    <ul className="mb-2.5 space-y-1.5">
-                      {comments.map((c) => (
-                        <li
-                          key={c.id}
-                          className="rounded-2xl bg-cream/80 px-3 py-2 text-xs leading-5 text-ink"
-                        >
-                          <span className="font-semibold text-clay-deep">
-                            {c.user_id === userId ? 'You' : shortAuthor(c.author_email)}:{' '}
-                          </span>
-                          <span>{c.comment_text}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="mb-2 flex items-center gap-1 text-[11px] text-muted">
-                      <MessageCircle className="h-3 w-3" /> Start a note on this memory…
-                    </p>
-                  )}
-
-                  <form
-                    onSubmit={(e) => {
-                      e.preventDefault()
-                      void submitComment(entry.id)
-                    }}
-                    className="flex items-center gap-1.5"
-                  >
-                    <input
-                      type="text"
-                      value={drafts[entry.id] || ''}
-                      onChange={(e) =>
-                        setDrafts((prev) => ({ ...prev, [entry.id]: e.target.value }))
-                      }
-                      placeholder="Write a reply…"
-                      className="min-w-0 flex-1 rounded-full border border-line bg-cream/60 px-3 py-1.5 text-xs text-ink placeholder:text-muted focus:border-clay focus:outline-none"
-                    />
-                    <button
-                      type="submit"
-                      disabled={submittingId === entry.id || !(drafts[entry.id] || '').trim()}
-                      title="Send reply"
-                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-clay text-paper transition hover:bg-clay-deep disabled:opacity-40"
-                    >
-                      <Send className="h-3 w-3" />
-                    </button>
-                  </form>
-                </div>
+                <CommentSection
+                  entryId={entry.id}
+                  userId={userId}
+                  userEmail={userEmail}
+                  comments={entry.comments ?? []}
+                  onCommentAdded={onCommentAdded}
+                />
               </div>
             </article>
           )
@@ -266,6 +242,15 @@ export function Timeline({
           src={expandedSrc}
           formattedDate={formatWhen(expandedEntry.created_at)}
           onClose={() => setExpandedEntry(null)}
+        />
+      ) : null}
+
+      {confirmDeleteEntry ? (
+        <DeleteConfirmModal
+          headerLabel={getEntryHeader(confirmDeleteEntry)}
+          deleting={deleting}
+          onConfirm={() => void confirmDelete()}
+          onCancel={() => setConfirmDeleteEntry(null)}
         />
       ) : null}
     </section>

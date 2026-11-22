@@ -1,8 +1,24 @@
 import { Router, type NextFunction, type Request, type Response } from 'express';
 import multer from 'multer';
 import { HttpError } from '../errors';
-import { hasDriveConnection, insertComment, listAllComments, insertEntry, listEntries, upsertDriveTokens } from '../services/dbService';
-import { exchangeCode, getConsentUrl, openImageStream, uploadImage, uploadTextBackup } from '../services/driveService';
+import {
+  deleteEntryById,
+  getEntryById,
+  hasDriveConnection,
+  insertComment,
+  insertEntry,
+  listAllComments,
+  listEntries,
+  upsertDriveTokens,
+} from '../services/dbService';
+import {
+  deleteDriveFile,
+  exchangeCode,
+  getConsentUrl,
+  openImageStream,
+  uploadImage,
+  uploadTextBackup,
+} from '../services/driveService';
 
 const router = Router();
 
@@ -149,6 +165,33 @@ router.post('/entries/:entryId/comments', wrap(async (req, res) => {
 
   res.status(201).json(comment);
 }));
+
+
+router.delete('/entries/:entryId', wrap(async (req, res) => {
+  const entryId = req.params.entryId;
+  const userId = requireUserId(req.query.user_id || req.body?.user_id);
+
+  if (!entryId) {
+    throw new HttpError(400, 'entryId is required');
+  }
+
+  const entry = await getEntryById(entryId);
+  if (!entry) {
+    throw new HttpError(404, 'Memory not found');
+  }
+
+  if (entry.user_id !== userId) {
+    throw new HttpError(403, 'Only the creator of this post can delete it');
+  }
+
+  if (entry.drive_file_id) {
+    await deleteDriveFile(userId, entry.drive_file_id);
+  }
+
+  await deleteEntryById(entryId);
+  res.json({ deleted: true });
+}));
+
 
 
 router.get('/media/image/:fileId', wrap(async (req, res) => {

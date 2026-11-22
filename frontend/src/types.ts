@@ -1,3 +1,12 @@
+export type EntryComment = {
+  id: string
+  entry_id: string
+  user_id: string
+  author_email: string
+  comment_text: string
+  created_at: string
+}
+
 export type Entry = {
   id: string
   user_id: string
@@ -11,4 +20,5 @@ export type Entry = {
   original_size_kb: number | string | null
   compressed_size_kb: number | string | null
   created_at: string
+  comments?: EntryComment[]
 }

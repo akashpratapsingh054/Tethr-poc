@@ -6,7 +6,7 @@ import type { StoredOAuthTokens } from '../types';
 import { getDriveTokens, upsertDriveTokens } from './dbService';
 
 const FOLDER_NAME = 'Tethr_Memories';
-const DRIVE_SCOPE = 'https://googleapis.com';
+const DRIVE_SCOPE = 'https://www.googleapis.com' + '/auth/drive.file';
 
 function createOAuthClient() {
   return new google.auth.OAuth2(
